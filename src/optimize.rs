@@ -1,4 +1,6 @@
-use crate::{day::Day, event::Event, timeslot::Timeslot, week_event::WeekEvent};
+use crate::{
+    day::Day, event::Event, timeslot::Timeslot, timestamp_ms::TimestampMs, week_event::WeekEvent,
+};
 
 pub fn optimize(_events_to_schedule: Vec<Event>, typical_week: Vec<WeekEvent>) {
     /*
@@ -20,22 +22,23 @@ pub fn optimize(_events_to_schedule: Vec<Event>, typical_week: Vec<WeekEvent>) {
         if events_on_that_day.is_empty() {
             free_slots.push(Timeslot::FULL_DAY);
         } else {
-            for i in 0..events_on_that_day.len() {
-                if i == 0 {
-                    // first event
-                    free_slots.push(Timeslot::new(0, events_on_that_day[i].start_hour_ms));
-                } else {
-                    free_slots.push(Timeslot::new(
-                        events_on_that_day[i - 1].end_hour_ms,
-                        events_on_that_day[i].start_hour_ms,
-                    ));
+            let mut current_time: TimestampMs = 0;
 
-                    if i == events_on_that_day.len() - 1 {
-                        // last event, so we need to add a slot after it
-                        free_slots.push(Timeslot::new(events_on_that_day[i].end_hour_ms, 86399999));
-                    }
+            for event in &events_on_that_day {
+                if event.start_hour_ms > current_time {
+                    free_slots.push(Timeslot::new(current_time, event.start_hour_ms));
+                }
+
+                if event.end_hour_ms > current_time {
+                    current_time = event.end_hour_ms;
                 }
             }
+
+            if current_time < 86399999 {
+                free_slots.push(Timeslot::new(current_time, 86399999));
+            }
         }
+
+        println!("{:#?}: {:#?}\n{:#?}", day, events_on_that_day, free_slots);
     }
 }
