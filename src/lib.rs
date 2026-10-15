@@ -1,4 +1,5 @@
 pub mod day;
+pub mod day_timeslots;
 pub mod event;
 pub mod optimize;
 pub mod timeslot;
