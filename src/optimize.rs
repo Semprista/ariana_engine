@@ -56,13 +56,13 @@ mod tests {
     fn setup_two_events_schedule() -> Vec<WeekEvent> {
         vec![
             WeekEvent::new(
-                "Focus",
+                "Focus A",
                 MONDAY,
                 10 * 60 * 60 * 1000 + 15 * 60 * 1000,
                 12 * 60 * 60 * 1000,
             ), // 10:15 - 12:00
             WeekEvent::new(
-                "Focus",
+                "Focus B",
                 MONDAY,
                 16 * 60 * 60 * 1000 + 15 * 60 * 1000,
                 18 * 60 * 60 * 1000,
@@ -73,7 +73,7 @@ mod tests {
     fn setup_conflicting_events_schedule() -> Vec<WeekEvent> {
         vec![
             WeekEvent::new(
-                "Réunion B",
+                "Meeting",
                 MONDAY,
                 11 * 60 * 60 * 1000 + 30 * 60 * 1000,
                 13 * 60 * 60 * 1000,
