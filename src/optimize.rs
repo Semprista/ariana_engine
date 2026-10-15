@@ -1,9 +1,9 @@
 use crate::{
-    day::Day, day_timeslots::DayTimeslots, event::Event, timeslot::Timeslot,
+    day::Day, day_timeslots::DayTimeslots, event_to_schedule::EventToSchedule, timeslot::Timeslot,
     timestamp_ms::TimestampMs, week_event::WeekEvent,
 };
 
-pub fn optimize(_events_to_schedule: Vec<Event>, typical_week: Vec<WeekEvent>) {
+pub fn optimize(_events_to_schedule: Vec<EventToSchedule>, typical_week: Vec<WeekEvent>) {
     let mut free_slots: Vec<DayTimeslots> = vec![];
     /*
      * Search all free slots on the week

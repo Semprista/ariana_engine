@@ -1,6 +1,6 @@
 pub mod day;
 pub mod day_timeslots;
-pub mod event;
+pub mod event_to_schedule;
 pub mod optimize;
 pub mod timeslot;
 pub mod timestamp_ms;

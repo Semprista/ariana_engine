@@ -1,14 +1,14 @@
 use crate::timestamp_ms::TimestampMs;
 
 #[derive(Debug)]
-pub struct Event {
+pub struct EventToSchedule {
     pub label: String,
     pub duration_ms_per_week: TimestampMs,
     pub min_duration_ms_per_session: TimestampMs,
     pub max_duration_ms_per_session: TimestampMs,
 }
 
-impl Event {
+impl EventToSchedule {
     pub fn new(
         label: &str,
         duration_ms_per_week: TimestampMs,
