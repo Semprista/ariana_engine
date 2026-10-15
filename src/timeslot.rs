@@ -1,6 +1,6 @@
 use crate::timestamp_ms::TimestampMs;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Timeslot {
     pub start_hour_ms: TimestampMs,
     pub end_hour_ms: TimestampMs,
