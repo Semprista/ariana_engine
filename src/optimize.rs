@@ -1,8 +1,10 @@
 use crate::{
-    day::Day, event::Event, timeslot::Timeslot, timestamp_ms::TimestampMs, week_event::WeekEvent,
+    day::Day, day_timeslots::DayTimeslots, event::Event, timeslot::Timeslot,
+    timestamp_ms::TimestampMs, week_event::WeekEvent,
 };
 
 pub fn optimize(_events_to_schedule: Vec<Event>, typical_week: Vec<WeekEvent>) {
+    let mut free_slots: Vec<DayTimeslots> = vec![];
     /*
      * Search all free slots on the week
      * We loop on each day because it's easier
@@ -13,7 +15,8 @@ pub fn optimize(_events_to_schedule: Vec<Event>, typical_week: Vec<WeekEvent>) {
             .filter(|event| event.day == *day)
             .collect();
 
-        let _free_slots = find_free_slots(events_on_that_day);
+        let day_free_slots = DayTimeslots::new(*day, find_free_slots(events_on_that_day));
+        free_slots.push(day_free_slots);
     }
 }
 
