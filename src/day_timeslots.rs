@@ -1,8 +1,8 @@
 use crate::{day::Day, timeslot::Timeslot};
 
 pub struct DayTimeslots {
-    day: Day,
-    timeslots: Vec<Timeslot>,
+    pub day: Day,
+    pub timeslots: Vec<Timeslot>,
 }
 
 impl DayTimeslots {
