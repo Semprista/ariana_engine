@@ -8,39 +8,43 @@ pub fn optimize(_events_to_schedule: Vec<Event>, typical_week: Vec<WeekEvent>) {
      * We loop on each day because it's easier
      */
     for day in Day::iterator() {
-        let mut free_slots: Vec<Timeslot> = Vec::new();
-        // Get all events on that day
-        let mut events_on_that_day: Vec<&WeekEvent> = typical_week
+        let events_on_that_day: Vec<&WeekEvent> = typical_week
             .iter()
             .filter(|event| event.day == *day)
             .collect();
 
-        // Get all theses sorted
-        events_on_that_day.sort_by(|a, b| a.start_hour_ms.cmp(&b.start_hour_ms));
+        let free_slots = find_free_slots(events_on_that_day);
+    }
+}
 
-        // check if ther is an event today
-        if events_on_that_day.is_empty() {
-            free_slots.push(Timeslot::FULL_DAY);
-        } else {
-            let mut current_time: TimestampMs = 0;
+fn find_free_slots(mut events: Vec<&WeekEvent>) -> Vec<Timeslot> {
+    let mut free_slots: Vec<Timeslot> = Vec::new();
 
-            for event in &events_on_that_day {
-                if event.start_hour_ms > current_time {
-                    free_slots.push(Timeslot::new(current_time, event.start_hour_ms));
-                }
+    // Get all events sorted
+    events.sort_by(|a, b| a.start_hour_ms.cmp(&b.start_hour_ms));
 
-                if event.end_hour_ms > current_time {
-                    current_time = event.end_hour_ms;
-                }
+    // check if ther is an event today
+    if events.is_empty() {
+        free_slots.push(Timeslot::FULL_DAY);
+    } else {
+        let mut current_time: TimestampMs = 0;
+
+        for event in &events {
+            if event.start_hour_ms > current_time {
+                free_slots.push(Timeslot::new(current_time, event.start_hour_ms));
             }
 
-            if current_time < 86399999 {
-                free_slots.push(Timeslot::new(current_time, 86399999));
+            if event.end_hour_ms > current_time {
+                current_time = event.end_hour_ms;
             }
         }
 
-        println!("{:#?}: {:#?}\n{:#?}", day, events_on_that_day, free_slots);
+        if current_time < Timeslot::END_OF_DAY {
+            free_slots.push(Timeslot::new(current_time, Timeslot::END_OF_DAY));
+        }
     }
+
+    return free_slots;
 }
 
 #[cfg(test)]
