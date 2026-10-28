@@ -1,32 +1,42 @@
 use crate::{
-    day::Day, day_timeslots::DayTimeslots, event_to_schedule::EventToSchedule, timeslot::Timeslot,
-    timestamp_ms::TimestampMs, week_event::WeekEvent,
+    day::Day, day_name::DayName, day_timeslots::DayTimeslots,
+    event_to_schedule::EventToSchedule, timeslot::Timeslot, timestamp_ms::TimestampMs,
+    week_event::WeekEvent, week_free_slots::WeekFreeSlots,
 };
 
-pub fn optimize(_events_to_schedule: Vec<EventToSchedule>, typical_week: Vec<WeekEvent>) {
-    let mut free_slots: Vec<DayTimeslots> = vec![];
+pub fn optimize(
+    events_to_schedule: Vec<EventToSchedule>,
+    typical_week: Vec<WeekEvent>,
+) -> Vec<WeekEvent> {
+    let mut free_slots: WeekFreeSlots = vec![];
+    let mut current_week: Vec<Day> = vec![];
+
     /*
      * Search all free slots on the week
      * We loop on each day because it's easier
      */
-    for day in Day::iterator() {
-        let events_on_that_day: Vec<&WeekEvent> = typical_week
+    for day in DayName::iterator() {
+        let events_on_that_day: Vec<WeekEvent> = typical_week
             .iter()
             .filter(|event| event.day == *day)
+            .cloned()
             .collect();
 
-        let day_free_slots = DayTimeslots::new(*day, find_free_slots(events_on_that_day));
+        let day_free_slots = DayTimeslots::new(
+            *day,
+            find_free_slots(events_on_that_day.iter().collect()),
+        );
         free_slots.push(day_free_slots);
+        current_week.push(Day::new(*day, events_on_that_day));
     }
+    schedule_events(current_week, events_to_schedule, free_slots)
 }
 
 fn find_free_slots(mut events: Vec<&WeekEvent>) -> Vec<Timeslot> {
     let mut free_slots: Vec<Timeslot> = Vec::new();
 
-    // Get all events sorted
     events.sort_by(|a, b| a.start_hour_ms.cmp(&b.start_hour_ms));
 
-    // check if ther is an event today
     if events.is_empty() {
         free_slots.push(Timeslot::FULL_DAY);
     } else {
@@ -50,12 +60,91 @@ fn find_free_slots(mut events: Vec<&WeekEvent>) -> Vec<Timeslot> {
     return free_slots;
 }
 
+fn schedule_events(
+    mut current_week: Vec<Day>,
+    mut events_to_schedule: Vec<EventToSchedule>,
+    mut free_slots: WeekFreeSlots,
+) -> Vec<WeekEvent> {
+    let mut scheduled_events: Vec<WeekEvent> = Vec::new();
+
+    loop {
+        let Some(event) = events_to_schedule
+            .iter_mut()
+            .find(|e| e.remaining_duration_ms > 0)
+        else {
+            break;
+        };
+
+        current_week.sort_by_key(|day| day.total());
+
+        let mut slot_found = None;
+
+        for day in &current_week {
+            if let Some(day_slots) = free_slots.iter_mut().find(|ds| ds.day_name == day.name) {
+                if let Some((slot_idx, slot)) = day_slots
+                    .timeslots
+                    .iter()
+                    .enumerate()
+                    .find(|(_, s)| s.duration() >= event.min_duration_ms_per_session)
+                {
+                    slot_found = Some((day.name, slot_idx, slot.start_hour_ms, slot.duration()));
+                    break;
+                }
+            }
+        }
+
+        let Some((day_name, slot_idx, slot_start, slot_duration)) = slot_found else {
+            break;
+        };
+
+        let session_duration = event
+            .max_duration_ms_per_session
+            .min(event.remaining_duration_ms)
+            .min(slot_duration);
+
+        let session_start = slot_start;
+        let session_end = slot_start + session_duration;
+
+        event.remaining_duration_ms -= session_duration;
+
+        let day_slots = free_slots
+            .iter_mut()
+            .find(|ds| ds.day_name == day_name)
+            .unwrap();
+        day_slots.timeslots[slot_idx].start_hour_ms += session_duration;
+        if day_slots.timeslots[slot_idx].duration() == 0 {
+            day_slots.timeslots.remove(slot_idx);
+        }
+
+        if let Some(day) = current_week.iter_mut().find(|d| d.name == day_name) {
+            day.events.push(WeekEvent::new(
+                &event.label,
+                day_name,
+                session_start,
+                session_end,
+            ));
+        }
+
+        scheduled_events.push(WeekEvent::new(
+            &event.label,
+            day_name,
+            session_start,
+            session_end,
+        ));
+    }
+
+    scheduled_events
+}
+
 #[cfg(test)]
 mod tests {
     use std::vec;
 
     use crate::{
-        day::Day::MONDAY, optimize::find_free_slots, timeslot::Timeslot, week_event::WeekEvent,
+        day_name::DayName::MONDAY,
+        optimize::{find_free_slots, schedule_events},
+        timeslot::Timeslot,
+        week_event::WeekEvent,
     };
 
     fn setup_no_event_free_slot() -> Vec<Timeslot> {
@@ -224,5 +313,59 @@ mod tests {
 
         let free_slots = find_free_slots(events);
         assert_eq!(free_slots, setup_conflicting_events_free_slots());
+    }
+
+    #[test]
+    fn schedule_event_test() {
+        use crate::{
+            day_name::DayName::{FRIDAY, MONDAY, TUESDAY},
+            day_timeslots::DayTimeslots,
+            timeslot::Timeslot,
+        };
+
+        let free_slots = vec![
+            DayTimeslots::new(
+                MONDAY,
+                vec![
+                    Timeslot::new(8 * 60 * 60 * 1000, 10 * 60 * 60 * 1000),
+                    Timeslot::new(13 * 60 * 60 * 1000, 17 * 60 * 60 * 1000),
+                ],
+            ),
+            DayTimeslots::new(
+                TUESDAY,
+                vec![Timeslot::new(9 * 60 * 60 * 1000, 12 * 60 * 60 * 1000)],
+            ),
+            DayTimeslots::new(FRIDAY, vec![Timeslot::new(0, Timeslot::END_OF_DAY)]),
+        ];
+
+        let events_to_schedule = vec![];
+
+        let result = schedule_events(vec![], events_to_schedule, free_slots);
+        assert_eq!(result, vec![]);
+    }
+
+    #[test]
+    fn optimize_places_events_correctly() {
+        use super::optimize;
+        use crate::day_name::DayName;
+        use crate::event_to_schedule::EventToSchedule;
+        use crate::timestamp_ms::TimestampMs;
+
+        let events_to_schedule = vec![EventToSchedule::new(
+            "Sport",
+            2 * 60 * 60 * 1000, // 2h total
+            1 * 60 * 60 * 1000, // min 1h
+            2 * 60 * 60 * 1000, // max 2h
+        )];
+
+        let typical_week = vec![
+            WeekEvent::new("Work", DayName::MONDAY, 8 * 60 * 60 * 1000, 18 * 60 * 60 * 1000),
+        ];
+
+        let scheduled = optimize(events_to_schedule, typical_week);
+        assert!(!scheduled.is_empty());
+        assert_eq!(scheduled[0].label, "Sport");
+        let total_duration: TimestampMs = scheduled.iter().map(|e| e.duration()).sum();
+        assert_eq!(total_duration, 2 * 60 * 60 * 1000);
     }
 }
