@@ -6,6 +6,7 @@ pub struct EventToSchedule {
     pub duration_ms_per_week: TimestampMs,
     pub min_duration_ms_per_session: TimestampMs,
     pub max_duration_ms_per_session: TimestampMs,
+    pub remaining_duration_ms: TimestampMs,
 }
 
 impl EventToSchedule {
@@ -20,6 +21,7 @@ impl EventToSchedule {
             duration_ms_per_week: duration_ms_per_week,
             min_duration_ms_per_session: min_duration_ms_per_session,
             max_duration_ms_per_session: max_duration_ms_per_session,
+            remaining_duration_ms: duration_ms_per_week,
         }
     }
 }
