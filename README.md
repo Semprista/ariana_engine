@@ -1,4 +1,6 @@
-# Ariana Engine
+![banner](./banner.png)
+
+# Ariana
 
 Ariana Engine is a Rust library for weekly schedule planning. It provides the basic building blocks for representing planned activities, recurring weekly events, weekdays, and time slots.
 
