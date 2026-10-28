@@ -1,22 +1,21 @@
-use crate::day::Day::{FRIDAY, MONDAY, SATURDAY, SUNDAY, THURDSAY, TUESDAY, WEDNESDAY};
-use std::slice::Iter;
+use crate::{day_name::DayName, timestamp_ms::TimestampMs, week_event::WeekEvent};
 
-#[derive(Debug, PartialEq, Copy, Clone, Eq, PartialOrd, Ord)]
-pub enum Day {
-    MONDAY,
-    TUESDAY,
-    WEDNESDAY,
-    THURDSAY,
-    FRIDAY,
-    SATURDAY,
-    SUNDAY,
+pub struct Day {
+    pub name: DayName,
+    pub events: Vec<WeekEvent>,
 }
 
 impl Day {
-    pub fn iterator() -> Iter<'static, Day> {
-        static DAYS: [Day; 7] = [
-            MONDAY, TUESDAY, WEDNESDAY, THURDSAY, FRIDAY, SATURDAY, SUNDAY,
-        ];
-        DAYS.iter()
+    pub fn new(name: DayName, events: Vec<WeekEvent>) -> Self {
+        Self { name, events }
+    }
+
+    pub fn total(&self) -> TimestampMs {
+        let mut sum: TimestampMs = 0;
+        for event in self.events.iter() {
+            sum += event.duration()
+        }
+
+        return sum;
     }
 }
