@@ -1,9 +1,9 @@
-use crate::{day::Day, timestamp_ms::TimestampMs};
+use crate::{day_name::DayName, timestamp_ms::TimestampMs};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct WeekEvent {
     pub label: String,
-    pub day: Day,
+    pub day: DayName,
     pub start_hour_ms: TimestampMs,
     pub end_hour_ms: TimestampMs,
 }
@@ -11,7 +11,7 @@ pub struct WeekEvent {
 impl WeekEvent {
     pub fn new(
         label: &str,
-        day: Day,
+        day: DayName,
         start_hour_ms: TimestampMs,
         end_hour_ms: TimestampMs,
     ) -> Self {

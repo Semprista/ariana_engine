@@ -1,14 +1,15 @@
-use crate::{day::Day, timeslot::Timeslot};
+use crate::{day_name::DayName, timeslot::Timeslot};
 
+#[derive(Debug)]
 pub struct DayTimeslots {
-    pub day: Day,
+    pub day_name: DayName,
     pub timeslots: Vec<Timeslot>,
 }
 
 impl DayTimeslots {
-    pub const fn new(day: Day, timeslots: Vec<Timeslot>) -> Self {
+    pub const fn new(day: DayName, timeslots: Vec<Timeslot>) -> Self {
         Self {
-            day: day,
+            day_name: day,
             timeslots: timeslots,
         }
     }
