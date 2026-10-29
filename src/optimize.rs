@@ -17,7 +17,7 @@ enum ArianaError {
 /**
  * TODO: rename to "Day" after day::Day deletion
  */
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 enum WeekDay {
     MONDAY,
     TUESDAY,
@@ -86,7 +86,7 @@ pub fn optimize(
             .filter(|event| event.day == week_day)
             .collect();
 
-        let day_free_slots = find_free_slots(week_day, events_on_that_day);
+        let day_free_slots = find_free_slots(week_day, &events_on_that_day);
         // free_slots.push(day_free_slots);
         // current_week.push(Day::new(*day, events_on_that_day));
     }
@@ -98,22 +98,23 @@ pub fn optimize(
     schedule_events(current_week, events_to_schedule, free_slots);
 }
 
-fn find_free_slots(day: WeekDay, mut events: Vec<&Event>) -> Result<Vec<Timeslot>, ArianaError> {
+fn find_free_slots(day: WeekDay, events: &[&Event]) -> Vec<Timeslot> {
     let mut free_slots: Vec<Timeslot> = Vec::new();
 
-    events.sort_by(|a, b| a.start_time_ms.cmp(&b.start_time_ms));
+    let mut sorted_events: Vec<&Event> = events.to_vec();
+    sorted_events.sort_by_key(|e| e.start_time_ms);
 
     if events.is_empty() {
         free_slots.push(Timeslot::full_day_timeslot(day));
     } else {
-        let mut current_time: TimestampMs = 0;
+        let mut current_time: u64 = 0;
 
-        for event in &events {
+        for event in sorted_events {
             if event.start_time_ms > current_time {
                 free_slots.push(Timeslot {
                     day: day,
-                    start_hour_ms: event.start_time_ms,
-                    end_hour_ms: event.end_time_ms,
+                    start_hour_ms: current_time,
+                    end_hour_ms: event.start_time_ms,
                 });
             }
 
@@ -131,7 +132,7 @@ fn find_free_slots(day: WeekDay, mut events: Vec<&Event>) -> Result<Vec<Timeslot
         }
     }
 
-    return Ok(free_slots);
+    return free_slots;
 }
 
 fn schedule_events(
