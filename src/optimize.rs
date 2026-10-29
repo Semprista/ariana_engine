@@ -1,31 +1,81 @@
 use crate::{
-    day::Day, day_name::DayName, day_timeslots::DayTimeslots,
-    event_to_schedule::EventToSchedule, timeslot::Timeslot, timestamp_ms::TimestampMs,
-    week_event::WeekEvent, week_free_slots::WeekFreeSlots,
+    day::Day,
+    day_timeslots::DayTimeslots,
+    event_to_schedule::EventToSchedule,
+    optimize::WeekDay::{FRIDAY, MONDAY, SATURDAY, SUNDAY, THURSDAY, TUESDAY, WEDNESDAY},
+    timestamp_ms::TimestampMs,
+    week_event::WeekEvent,
+    week_free_slots::WeekFreeSlots,
 };
+use std::vec;
+
+enum ArianaError {
+    NoFreeTimeSlots,
+    SchedulableEventIncoherence,
+}
+
+/**
+ * TODO: rename to "Day" after day::Day deletion
+ */
+#[derive(PartialEq)]
+enum WeekDay {
+    MONDAY,
+    TUESDAY,
+    WEDNESDAY,
+    THURSDAY,
+    FRIDAY,
+    SATURDAY,
+    SUNDAY,
+}
+
+struct SchedulableEvent {
+    label: String,
+    preferred_days: Vec<Day>, // NOT USED AS FOR NOW
+    weekly_duration_ms: u64,
+    min_session_duration: u64,
+    max_session_duration: u64,
+}
+
+struct Event {
+    label: String,
+    day: WeekDay, // TODO: rename
+    start_time_ms: u64,
+    end_time_ms: u64,
+}
+
+struct Planning {
+    events: Vec<Event>,
+}
+
+struct Timeslot {
+    day: WeekDay, // TODO: rename
+    start_hour_ms: u64,
+    end_hour_ms: u64,
+}
 
 pub fn optimize(
-    events_to_schedule: Vec<EventToSchedule>,
-    typical_week: Vec<WeekEvent>,
-) -> Vec<WeekEvent> {
+    events_to_schedule: Vec<SchedulableEvent>,
+    current_planning: Planning,
+) -> Result<Vec<WeekEvent>, ArianaError> {
+    let week_days: Vec<WeekDay> = vec![
+        MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY,
+    ];
     let mut free_slots: WeekFreeSlots = vec![];
-    let mut current_week: Vec<Day> = vec![];
+    let mut optimized_planning_events: Vec<Event> = vec![];
 
     /*
      * Search all free slots on the week
      * We loop on each day because it's easier
      */
-    for day in DayName::iterator() {
-        let events_on_that_day: Vec<WeekEvent> = typical_week
+    for week_day in week_days {
+        let events_on_that_day: Vec<&Event> = current_planning
+            .events
             .iter()
-            .filter(|event| event.day == *day)
-            .cloned()
+            .filter(|event| event.day == week_day)
             .collect();
 
-        let day_free_slots = DayTimeslots::new(
-            *day,
-            find_free_slots(events_on_that_day.iter().collect()),
-        );
+        let day_free_slots =
+            DayTimeslots::new(*day, find_free_slots(events_on_that_day.iter().collect()));
         free_slots.push(day_free_slots);
         current_week.push(Day::new(*day, events_on_that_day));
     }
@@ -358,9 +408,12 @@ mod tests {
             2 * 60 * 60 * 1000, // max 2h
         )];
 
-        let typical_week = vec![
-            WeekEvent::new("Work", DayName::MONDAY, 8 * 60 * 60 * 1000, 18 * 60 * 60 * 1000),
-        ];
+        let typical_week = vec![WeekEvent::new(
+            "Work",
+            DayName::MONDAY,
+            8 * 60 * 60 * 1000,
+            18 * 60 * 60 * 1000,
+        )];
 
         let scheduled = optimize(events_to_schedule, typical_week);
         assert!(!scheduled.is_empty());
