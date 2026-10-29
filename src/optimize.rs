@@ -53,6 +53,18 @@ struct Timeslot {
     end_hour_ms: u64,
 }
 
+impl Timeslot {
+    const END_OF_DAY: u64 = 86_399_999;
+
+    fn full_day_timeslot(day: WeekDay) -> Self {
+        Timeslot {
+            day: day,
+            start_hour_ms: 0,        // 00:00
+            end_hour_ms: 86_399_999, // 23:59:59:999
+        }
+    }
+}
+
 pub fn optimize(
     events_to_schedule: Vec<SchedulableEvent>,
     current_planning: Planning,
@@ -60,7 +72,7 @@ pub fn optimize(
     let week_days: Vec<WeekDay> = vec![
         MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY,
     ];
-    let mut free_slots: WeekFreeSlots = vec![];
+    let mut week_free_slots: WeekFreeSlots = vec![];
     let mut optimized_planning_events: Vec<Event> = vec![];
 
     /*
@@ -74,40 +86,52 @@ pub fn optimize(
             .filter(|event| event.day == week_day)
             .collect();
 
-        let day_free_slots =
-            DayTimeslots::new(*day, find_free_slots(events_on_that_day.iter().collect()));
-        free_slots.push(day_free_slots);
-        current_week.push(Day::new(*day, events_on_that_day));
+        let day_free_slots = find_free_slots(week_day, events_on_that_day);
+        // free_slots.push(day_free_slots);
+        // current_week.push(Day::new(*day, events_on_that_day));
     }
-    schedule_events(current_week, events_to_schedule, free_slots)
+
+    if week_free_slots.is_empty() {
+        return Err(ArianaError::NoFreeTimeSlots);
+    }
+
+    schedule_events(current_week, events_to_schedule, free_slots);
 }
 
-fn find_free_slots(mut events: Vec<&WeekEvent>) -> Vec<Timeslot> {
+fn find_free_slots(day: WeekDay, mut events: Vec<&Event>) -> Result<Vec<Timeslot>, ArianaError> {
     let mut free_slots: Vec<Timeslot> = Vec::new();
 
-    events.sort_by(|a, b| a.start_hour_ms.cmp(&b.start_hour_ms));
+    events.sort_by(|a, b| a.start_time_ms.cmp(&b.start_time_ms));
 
     if events.is_empty() {
-        free_slots.push(Timeslot::FULL_DAY);
+        free_slots.push(Timeslot::full_day_timeslot(day));
     } else {
         let mut current_time: TimestampMs = 0;
 
         for event in &events {
-            if event.start_hour_ms > current_time {
-                free_slots.push(Timeslot::new(current_time, event.start_hour_ms));
+            if event.start_time_ms > current_time {
+                free_slots.push(Timeslot {
+                    day: day,
+                    start_hour_ms: event.start_time_ms,
+                    end_hour_ms: event.end_time_ms,
+                });
             }
 
-            if event.end_hour_ms > current_time {
-                current_time = event.end_hour_ms;
+            if event.end_time_ms > current_time {
+                current_time = event.end_time_ms;
             }
         }
 
         if current_time < Timeslot::END_OF_DAY {
-            free_slots.push(Timeslot::new(current_time, Timeslot::END_OF_DAY));
+            free_slots.push(Timeslot {
+                day: day,
+                start_hour_ms: current_time,
+                end_hour_ms: Timeslot::END_OF_DAY,
+            });
         }
     }
 
-    return free_slots;
+    return Ok(free_slots);
 }
 
 fn schedule_events(
