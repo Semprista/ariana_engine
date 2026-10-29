@@ -1,12 +1,11 @@
 use crate::{
     day::Day,
-    event_to_schedule::EventToSchedule,
     optimize::WeekDay::{FRIDAY, MONDAY, SATURDAY, SUNDAY, THURSDAY, TUESDAY, WEDNESDAY},
     week_event::WeekEvent,
-    week_free_slots::WeekFreeSlots,
 };
 use std::vec;
 
+#[derive(Debug)]
 enum ArianaError {
     NoFreeTimeSlots,
     SchedulableEventIncoherence,
@@ -66,12 +65,11 @@ impl Timeslot {
 pub fn optimize(
     current_planning: Planning,
     events_to_schedule: Vec<SchedulableEvent>,
-) -> Result<Vec<WeekEvent>, ArianaError> {
+) -> Result<Planning, ArianaError> {
     let week_days: Vec<WeekDay> = vec![
         MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY,
     ];
     let mut week_free_slots: Vec<Timeslot> = vec![];
-    let mut optimized_planning_events: Vec<Event> = vec![];
 
     /*
      * Search all free slots on the week
@@ -84,7 +82,7 @@ pub fn optimize(
             .filter(|event| event.day == week_day)
             .collect();
 
-        let day_free_slots = find_free_slots(week_day, &events_on_that_day);
+        let mut day_free_slots = find_free_slots(week_day, &events_on_that_day);
         week_free_slots.append(&mut day_free_slots);
     }
 
@@ -92,7 +90,10 @@ pub fn optimize(
         return Err(ArianaError::NoFreeTimeSlots);
     }
 
-    schedule_events(current_planning, events_to_schedule, free_slots);
+    let optimized_planning_events: Planning =
+        schedule_events(current_planning, events_to_schedule, week_free_slots).unwrap();
+
+    return Ok(optimized_planning_events);
 }
 
 fn find_free_slots(day: WeekDay, events: &[&Event]) -> Vec<Timeslot> {
@@ -134,9 +135,9 @@ fn find_free_slots(day: WeekDay, events: &[&Event]) -> Vec<Timeslot> {
 
 fn schedule_events(
     mut current_planning: Planning,
-    mut events_to_schedule: Vec<EventToSchedule>,
-    mut free_slots: WeekFreeSlots,
-) -> Vec<WeekEvent> {
+    mut events_to_schedule: Vec<SchedulableEvent>,
+    mut free_slots: Vec<Timeslot>,
+) -> Result<Planning, ArianaError> {
     let mut scheduled_events: Vec<WeekEvent> = Vec::new();
 
     loop {
