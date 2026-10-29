@@ -64,8 +64,8 @@ impl Timeslot {
 }
 
 pub fn optimize(
-    events_to_schedule: Vec<SchedulableEvent>,
     current_planning: Planning,
+    events_to_schedule: Vec<SchedulableEvent>,
 ) -> Result<Vec<WeekEvent>, ArianaError> {
     let week_days: Vec<WeekDay> = vec![
         MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY,
@@ -92,7 +92,7 @@ pub fn optimize(
         return Err(ArianaError::NoFreeTimeSlots);
     }
 
-    schedule_events(current_week, events_to_schedule, free_slots);
+    schedule_events(current_planning, events_to_schedule, free_slots);
 }
 
 fn find_free_slots(day: WeekDay, events: &[&Event]) -> Vec<Timeslot> {
@@ -133,7 +133,7 @@ fn find_free_slots(day: WeekDay, events: &[&Event]) -> Vec<Timeslot> {
 }
 
 fn schedule_events(
-    mut current_week: Vec<Day>,
+    mut current_planning: Planning,
     mut events_to_schedule: Vec<EventToSchedule>,
     mut free_slots: WeekFreeSlots,
 ) -> Vec<WeekEvent> {
