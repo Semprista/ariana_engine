@@ -31,6 +31,7 @@ struct SchedulableEvent {
     weekly_duration_ms: u64,
     min_session_duration: u64,
     max_session_duration: u64,
+    remaining_duration_ms: u64,
 }
 
 struct Event {
@@ -40,8 +41,20 @@ struct Event {
     end_time_ms: u64,
 }
 
+impl Event {
+    fn duration(&self) -> u64 {
+        return self.end_time_ms - self.start_time_ms;
+    }
+}
+
 struct Planning {
     events: Vec<Event>,
+}
+
+impl Planning {
+    fn events_total_duration_ms(&self) -> u64 {
+        return self.events.iter().map(|e| e.duration()).sum();
+    }
 }
 
 struct Timeslot {
@@ -148,7 +161,7 @@ fn schedule_events(
             break;
         };
 
-        current_week.sort_by_key(|day| day.total());
+        current_planning.events.sort_by_key(|day| day.total());
 
         let mut slot_found = None;
 
