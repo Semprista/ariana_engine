@@ -72,7 +72,7 @@ pub fn optimize(
     let week_days: Vec<WeekDay> = vec![
         MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY,
     ];
-    let mut week_free_slots: WeekFreeSlots = vec![];
+    let mut week_free_slots: Vec<Timeslot> = vec![];
     let mut optimized_planning_events: Vec<Event> = vec![];
 
     /*
@@ -87,8 +87,7 @@ pub fn optimize(
             .collect();
 
         let day_free_slots = find_free_slots(week_day, &events_on_that_day);
-        // free_slots.push(day_free_slots);
-        // current_week.push(Day::new(*day, events_on_that_day));
+        week_free_slots.append(&mut day_free_slots);
     }
 
     if week_free_slots.is_empty() {
