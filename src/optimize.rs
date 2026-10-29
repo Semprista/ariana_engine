@@ -1,9 +1,7 @@
 use crate::{
     day::Day,
-    day_timeslots::DayTimeslots,
     event_to_schedule::EventToSchedule,
     optimize::WeekDay::{FRIDAY, MONDAY, SATURDAY, SUNDAY, THURSDAY, TUESDAY, WEDNESDAY},
-    timestamp_ms::TimestampMs,
     week_event::WeekEvent,
     week_free_slots::WeekFreeSlots,
 };
