@@ -3,7 +3,7 @@ use crate::{
     optimize::WeekDay::{FRIDAY, MONDAY, SATURDAY, SUNDAY, THURSDAY, TUESDAY, WEDNESDAY},
     week_event::WeekEvent,
 };
-use std::vec;
+use std::{collections::HashMap, vec};
 
 #[derive(Debug)]
 enum ArianaError {
@@ -48,7 +48,7 @@ impl Event {
 }
 
 struct Planning {
-    events: Vec<Event>,
+    events: HashMap<WeekDay, Vec<Event>>,
 }
 
 impl Planning {
@@ -79,24 +79,15 @@ pub fn optimize(
     current_planning: Planning,
     events_to_schedule: Vec<SchedulableEvent>,
 ) -> Result<Planning, ArianaError> {
-    let week_days: Vec<WeekDay> = vec![
-        MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY,
-    ];
     let mut week_free_slots: Vec<Timeslot> = vec![];
 
     /*
      * Search all free slots on the week
      * We loop on each day because it's easier
      */
-    for week_day in week_days {
-        let events_on_that_day: Vec<&Event> = current_planning
-            .events
-            .iter()
-            .filter(|event| event.day == week_day)
-            .collect();
-
-        let mut day_free_slots = find_free_slots(week_day, &events_on_that_day);
-        week_free_slots.append(&mut day_free_slots);
+    for (week_day, events_on_that_day) in current_planning.events {
+        let mut day_free_slots = find_free_slots(week_day, events_on_that_day);
+        week_free_slots.append(&mut day_free_slots)
     }
 
     if week_free_slots.is_empty() {
@@ -109,13 +100,13 @@ pub fn optimize(
     return Ok(optimized_planning_events);
 }
 
-fn find_free_slots(day: WeekDay, events: &[&Event]) -> Vec<Timeslot> {
+fn find_free_slots(day: WeekDay, events: Vec<Event>) -> Vec<Timeslot> {
     let mut free_slots: Vec<Timeslot> = Vec::new();
 
-    let mut sorted_events: Vec<&Event> = events.to_vec();
+    let mut sorted_events: Vec<Event> = events;
     sorted_events.sort_by_key(|e| e.start_time_ms);
 
-    if events.is_empty() {
+    if sorted_events.is_empty() {
         free_slots.push(Timeslot::full_day_timeslot(day));
     } else {
         let mut current_time: u64 = 0;
@@ -151,6 +142,9 @@ fn schedule_events(
     mut events_to_schedule: Vec<SchedulableEvent>,
     mut free_slots: Vec<Timeslot>,
 ) -> Result<Planning, ArianaError> {
+    let week_days: Vec<WeekDay> = vec![
+        MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY,
+    ];
     let mut scheduled_events: Vec<WeekEvent> = Vec::new();
 
     loop {
@@ -161,20 +155,29 @@ fn schedule_events(
             break;
         };
 
-        current_planning.events.sort_by_key(|day| day.total());
+        // TODO: sort days by events total duration
+        current_planning.events.sort_by_key(|day| day.duration());
 
         let mut slot_found = None;
 
-        for day in &current_week {
-            if let Some(day_slots) = free_slots.iter_mut().find(|ds| ds.day_name == day.name) {
-                if let Some((slot_idx, slot)) = day_slots
-                    .timeslots
-                    .iter()
-                    .enumerate()
-                    .find(|(_, s)| s.duration() >= event.min_duration_ms_per_session)
-                {
-                    slot_found = Some((day.name, slot_idx, slot.start_hour_ms, slot.duration()));
-                    break;
+        for day in week_days {
+            let events_on_that_day: Vec<&Event> = current_planning
+                .events
+                .iter()
+                .filter(|event| event.day == day)
+                .collect();
+
+            for event in events_on_that_day {
+                if let Some(day_slots) = free_slots.iter_mut().find(|ds| ds.day == day) {
+                    if let Some((slot_idx, slot)) = day_slots
+                        .iter()
+                        .enumerate()
+                        .find(|(_, s)| s.duration() >= event.min_duration_ms_per_session)
+                    {
+                        slot_found =
+                            Some((day.name, slot_idx, slot.start_hour_ms, slot.duration()));
+                        break;
+                    }
                 }
             }
         }
@@ -184,7 +187,7 @@ fn schedule_events(
         };
 
         let session_duration = event
-            .max_duration_ms_per_session
+            .max_session_duration
             .min(event.remaining_duration_ms)
             .min(slot_duration);
 
