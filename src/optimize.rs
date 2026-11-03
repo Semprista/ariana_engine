@@ -34,6 +34,7 @@ struct SchedulableEvent {
     remaining_duration_ms: u64,
 }
 
+#[derive(Clone)]
 struct Event {
     label: String,
     day: WeekDay, // TODO: rename
@@ -53,7 +54,12 @@ struct Planning {
 
 impl Planning {
     fn events_total_duration_ms(&self) -> u64 {
-        return self.events.iter().map(|e| e.duration()).sum();
+        return self
+            .events
+            .values()
+            .flatten()
+            .map(|event| event.duration())
+            .sum();
     }
 }
 
@@ -85,7 +91,7 @@ pub fn optimize(
      * Search all free slots on the week
      * We loop on each day because it's easier
      */
-    for (week_day, events_on_that_day) in current_planning.events {
+    for (week_day, events_on_that_day) in &current_planning.events {
         let mut day_free_slots = find_free_slots(week_day, events_on_that_day);
         week_free_slots.append(&mut day_free_slots)
     }
@@ -100,21 +106,21 @@ pub fn optimize(
     return Ok(optimized_planning_events);
 }
 
-fn find_free_slots(day: WeekDay, events: Vec<Event>) -> Vec<Timeslot> {
+fn find_free_slots(day: &WeekDay, events: &Vec<Event>) -> Vec<Timeslot> {
     let mut free_slots: Vec<Timeslot> = Vec::new();
 
-    let mut sorted_events: Vec<Event> = events;
+    let mut sorted_events: Vec<Event> = events.to_vec();
     sorted_events.sort_by_key(|e| e.start_time_ms);
 
     if sorted_events.is_empty() {
-        free_slots.push(Timeslot::full_day_timeslot(day));
+        free_slots.push(Timeslot::full_day_timeslot(*day));
     } else {
         let mut current_time: u64 = 0;
 
         for event in sorted_events {
             if event.start_time_ms > current_time {
                 free_slots.push(Timeslot {
-                    day: day,
+                    day: *day,
                     start_hour_ms: current_time,
                     end_hour_ms: event.start_time_ms,
                 });
@@ -127,7 +133,7 @@ fn find_free_slots(day: WeekDay, events: Vec<Event>) -> Vec<Timeslot> {
 
         if current_time < Timeslot::END_OF_DAY {
             free_slots.push(Timeslot {
-                day: day,
+                day: *day,
                 start_hour_ms: current_time,
                 end_hour_ms: Timeslot::END_OF_DAY,
             });
