@@ -1,12 +1,13 @@
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, vec};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum ArianaError {
     NoFreeTimeSlots,
     SchedulableEventIncoherence,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
 pub enum WeekDay {
     MONDAY,
     TUESDAY,
@@ -17,7 +18,7 @@ pub enum WeekDay {
     SUNDAY,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SchedulableEvent {
     pub label: String,
     pub weekly_duration_ms: u64,
@@ -43,7 +44,7 @@ impl SchedulableEvent {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Event {
     pub label: String,
     pub day: WeekDay,
@@ -66,7 +67,7 @@ impl Event {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Planning {
     pub events: HashMap<WeekDay, Vec<Event>>,
 }
@@ -259,8 +260,9 @@ pub fn schedule_events(
 #[cfg(test)]
 mod tests {
     use super::{
-        find_free_slots, optimize, schedule_events, Event, Planning, SchedulableEvent, Timeslot,
+        Event, Planning, SchedulableEvent, Timeslot,
         WeekDay::{FRIDAY, MONDAY, TUESDAY},
+        find_free_slots, optimize, schedule_events,
     };
 
     fn setup_no_event_free_slot() -> Vec<Timeslot> {
