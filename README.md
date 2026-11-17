@@ -6,11 +6,11 @@ Ariana Engine is a Rust library for weekly schedule planning. It provides the ba
 
 The engine can identify free time around existing events, detect conflicts, and distribute activities across the least busy days of the week. Its main domain types are:
 
-- `EventToSchedule`, which describes an activity to schedule (weekly duration, min/max session durations);
-- `WeekEvent`, which describes an event already occupying part of a typical week;
-- `Day`, which represents a weekday with its scheduled events;
-- `DayName`, an enum representing the days of the week;
-- `Timeslot`, which represents a time interval in milliseconds from midnight.
+- `Planning`, which holds the weekly schedule mapped by `WeekDay`;
+- `SchedulableEvent`, which describes an activity to schedule (weekly duration, min/max session durations);
+- `Event`, which describes an existing or scheduled event on a given day;
+- `WeekDay`, an enum representing the days of the week;
+- `Timeslot`, which represents a time interval in milliseconds from midnight for a given day.
 
 ## Status & Disclaimer
 
