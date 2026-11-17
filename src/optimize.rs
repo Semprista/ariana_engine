@@ -62,7 +62,7 @@ impl Event {
     }
 
     pub fn duration(&self) -> u64 {
-        return self.end_time_ms - self.start_time_ms;
+        self.end_time_ms - self.start_time_ms
     }
 }
 
@@ -86,12 +86,11 @@ impl Planning {
     }
 
     pub fn events_total_duration_ms(&self) -> u64 {
-        return self
-            .events
+        self.events
             .values()
             .flatten()
             .map(|event| event.duration())
-            .sum();
+            .sum()
     }
 }
 
@@ -115,7 +114,7 @@ impl Timeslot {
 
     pub fn full_day_timeslot(day: WeekDay) -> Self {
         Timeslot {
-            day: day,
+            day,
             start_hour_ms: 0,        // 00:00
             end_hour_ms: 86_399_999, // 23:59:59:999
         }
@@ -148,10 +147,10 @@ pub fn optimize(
     let optimized_planning_events: Planning =
         schedule_events(current_planning, events_to_schedule, week_free_slots)?;
 
-    return Ok(optimized_planning_events);
+    Ok(optimized_planning_events)
 }
 
-pub fn find_free_slots(day: &WeekDay, events: &Vec<Event>) -> Vec<Timeslot> {
+pub fn find_free_slots(day: &WeekDay, events: &[Event]) -> Vec<Timeslot> {
     let mut free_slots: Vec<Timeslot> = Vec::new();
 
     let mut sorted_events: Vec<Event> = events.to_vec();
@@ -185,7 +184,7 @@ pub fn find_free_slots(day: &WeekDay, events: &Vec<Event>) -> Vec<Timeslot> {
         }
     }
 
-    return free_slots;
+    free_slots
 }
 
 pub fn schedule_events(
@@ -203,14 +202,10 @@ pub fn schedule_events(
         WeekDay::SUNDAY,
     ];
 
-    loop {
-        let Some(event) = events_to_schedule
-            .iter_mut()
-            .find(|e| e.remaining_duration_ms > 0)
-        else {
-            break;
-        };
-
+    while let Some(event) = events_to_schedule
+        .iter_mut()
+        .find(|e| e.remaining_duration_ms > 0)
+    {
         // Sort days by total duration in current planning to balance the load
         let mut days_sorted = all_week_days;
         days_sorted.sort_by_key(|day| current_planning.day_total_duration_ms(*day));
