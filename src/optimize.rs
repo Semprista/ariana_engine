@@ -181,8 +181,12 @@ pub fn optimize(
         return Err(ArianaError::NoFreeTimeSlots);
     }
 
-    let optimized_planning_events: Planning =
-        schedule_events(current_planning, events_to_schedule, week_free_slots, categories)?;
+    let optimized_planning_events: Planning = schedule_events(
+        current_planning,
+        events_to_schedule,
+        week_free_slots,
+        categories,
+    )?;
 
     Ok(optimized_planning_events)
 }
@@ -308,11 +312,7 @@ pub fn schedule_events(
         }
 
         if original_slot.end_hour_ms > session_end {
-            new_slots.push(Timeslot::new(
-                day,
-                session_end,
-                original_slot.end_hour_ms,
-            ));
+            new_slots.push(Timeslot::new(day, session_end, original_slot.end_hour_ms));
         }
 
         // Insert new slots back
@@ -358,9 +358,9 @@ fn compute_allowed_window_for_event(
 #[cfg(test)]
 mod tests {
     use super::{
-        find_free_slots, optimize, schedule_events, Event, EventCategory, Planning,
-        SchedulableEvent, Timeslot,
+        Event, EventCategory, Planning, SchedulableEvent, Timeslot,
         WeekDay::{FRIDAY, MONDAY, TUESDAY},
+        find_free_slots, optimize, schedule_events,
     };
 
     fn setup_no_event_free_slot() -> Vec<Timeslot> {
