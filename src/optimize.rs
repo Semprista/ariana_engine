@@ -19,8 +19,26 @@ pub enum WeekDay {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EventCategory {
+    pub index: u8,
+    pub label: String,
+    pub timeslots: HashMap<WeekDay, Timeslot>,
+}
+
+impl EventCategory {
+    pub fn new(index: u8, label: &str, timeslots: HashMap<WeekDay, Timeslot>) -> Self {
+        Self {
+            index,
+            label: label.to_string(),
+            timeslots,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SchedulableEvent {
     pub label: String,
+    pub categories_indexes: Vec<u8>, // This allows us to combine two preferences (such as DEFAULT and SPORT)
     pub weekly_duration_ms: u64,
     pub min_session_duration: u64,
     pub max_session_duration: u64,
@@ -30,12 +48,14 @@ pub struct SchedulableEvent {
 impl SchedulableEvent {
     pub fn new(
         label: &str,
+        categories_indexes: Option<Vec<u8>>,
         weekly_duration_ms: u64,
         min_session_duration: u64,
         max_session_duration: u64,
     ) -> Self {
         Self {
             label: label.to_string(),
+            categories_indexes: categories_indexes.unwrap_or(vec![]),
             weekly_duration_ms,
             min_session_duration,
             max_session_duration,
@@ -95,7 +115,7 @@ impl Planning {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Timeslot {
     pub day: WeekDay,
     pub start_hour_ms: u64,
@@ -122,13 +142,29 @@ impl Timeslot {
     }
 
     pub fn duration(&self) -> u64 {
-        self.end_hour_ms - self.start_hour_ms
+        self.end_hour_ms.saturating_sub(self.start_hour_ms)
+    }
+
+    pub fn intersect(&self, other: &Timeslot) -> Option<Timeslot> {
+        if self.day != other.day {
+            return None;
+        }
+
+        let start = self.start_hour_ms.max(other.start_hour_ms);
+        let end = self.end_hour_ms.min(other.end_hour_ms);
+
+        if start < end {
+            Some(Timeslot::new(self.day, start, end))
+        } else {
+            None
+        }
     }
 }
 
 pub fn optimize(
     current_planning: Planning,
     events_to_schedule: Vec<SchedulableEvent>,
+    categories: Vec<EventCategory>,
 ) -> Result<Planning, ArianaError> {
     let mut week_free_slots: Vec<Timeslot> = vec![];
 
@@ -146,7 +182,7 @@ pub fn optimize(
     }
 
     let optimized_planning_events: Planning =
-        schedule_events(current_planning, events_to_schedule, week_free_slots)?;
+        schedule_events(current_planning, events_to_schedule, week_free_slots, categories)?;
 
     Ok(optimized_planning_events)
 }
@@ -192,6 +228,7 @@ pub fn schedule_events(
     mut current_planning: Planning,
     mut events_to_schedule: Vec<SchedulableEvent>,
     mut free_slots: Vec<Timeslot>,
+    categories: Vec<EventCategory>,
 ) -> Result<Planning, ArianaError> {
     let all_week_days: [WeekDay; 7] = [
         WeekDay::MONDAY,
@@ -202,6 +239,9 @@ pub fn schedule_events(
         WeekDay::SATURDAY,
         WeekDay::SUNDAY,
     ];
+
+    let categories_map: HashMap<u8, &EventCategory> =
+        categories.iter().map(|c| (c.index, c)).collect();
 
     while let Some(event) = events_to_schedule
         .iter_mut()
@@ -214,35 +254,72 @@ pub fn schedule_events(
         let mut slot_found: Option<(usize, WeekDay, u64, u64)> = None;
 
         for day in days_sorted {
-            if let Some((idx, slot)) = free_slots
-                .iter()
-                .enumerate()
-                .find(|(_, s)| s.day == day && s.duration() >= event.min_session_duration)
-            {
-                slot_found = Some((idx, day, slot.start_hour_ms, slot.duration()));
+            // Compute the allowed timeslot by intersecting all specified categories for this day
+            let allowed_window = compute_allowed_window_for_event(event, day, &categories_map);
+
+            let Some(allowed) = allowed_window else {
+                continue;
+            };
+
+            for (idx, slot) in free_slots.iter().enumerate() {
+                if slot.day == day {
+                    if let Some(intersection) = slot.intersect(&allowed) {
+                        if intersection.duration() >= event.min_session_duration {
+                            slot_found = Some((
+                                idx,
+                                day,
+                                intersection.start_hour_ms,
+                                intersection.duration(),
+                            ));
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if slot_found.is_some() {
                 break;
             }
         }
 
-        let Some((slot_idx, day, slot_start, slot_duration)) = slot_found else {
+        let Some((slot_idx, day, session_start, available_duration)) = slot_found else {
             break;
         };
 
         let session_duration = event
             .max_session_duration
             .min(event.remaining_duration_ms)
-            .min(slot_duration);
+            .min(available_duration);
 
-        let session_start = slot_start;
-        let session_end = slot_start + session_duration;
+        let session_end = session_start + session_duration;
 
         event.remaining_duration_ms -= session_duration;
 
-        // Update the free slot
-        let slot = &mut free_slots[slot_idx];
-        slot.start_hour_ms += session_duration;
-        if slot.duration() == 0 {
-            free_slots.remove(slot_idx);
+        // Split the original free slot around the placed session
+        let original_slot = free_slots.remove(slot_idx);
+        let mut new_slots = Vec::new();
+
+        if original_slot.start_hour_ms < session_start {
+            new_slots.push(Timeslot::new(
+                day,
+                original_slot.start_hour_ms,
+                session_start,
+            ));
+        }
+
+        if original_slot.end_hour_ms > session_end {
+            new_slots.push(Timeslot::new(
+                day,
+                session_end,
+                original_slot.end_hour_ms,
+            ));
+        }
+
+        // Insert new slots back
+        for s in new_slots {
+            if s.duration() > 0 {
+                free_slots.push(s);
+            }
         }
 
         // Add the scheduled event into current_planning
@@ -257,12 +334,33 @@ pub fn schedule_events(
     Ok(current_planning)
 }
 
+fn compute_allowed_window_for_event(
+    event: &SchedulableEvent,
+    day: WeekDay,
+    categories_map: &HashMap<u8, &EventCategory>,
+) -> Option<Timeslot> {
+    if event.categories_indexes.is_empty() {
+        return Some(Timeslot::full_day_timeslot(day));
+    }
+
+    let mut current_window = Timeslot::full_day_timeslot(day);
+
+    for cat_idx in &event.categories_indexes {
+        if let Some(category) = categories_map.get(cat_idx) {
+            let cat_slot = category.timeslots.get(&day)?;
+            current_window = current_window.intersect(cat_slot)?;
+        }
+    }
+
+    Some(current_window)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        Event, Planning, SchedulableEvent, Timeslot,
+        find_free_slots, optimize, schedule_events, Event, EventCategory, Planning,
+        SchedulableEvent, Timeslot,
         WeekDay::{FRIDAY, MONDAY, TUESDAY},
-        find_free_slots, optimize, schedule_events,
     };
 
     fn setup_no_event_free_slot() -> Vec<Timeslot> {
@@ -432,7 +530,7 @@ mod tests {
 
         let events_to_schedule = vec![];
 
-        let result = schedule_events(Planning::new(), events_to_schedule, free_slots);
+        let result = schedule_events(Planning::new(), events_to_schedule, free_slots, vec![]);
         assert_eq!(result, Ok(Planning::new()));
     }
 
@@ -440,6 +538,7 @@ mod tests {
     fn optimize_places_events_correctly() {
         let events_to_schedule = vec![SchedulableEvent::new(
             "Sport",
+            None,
             2 * 60 * 60 * 1000, // 2h total
             1 * 60 * 60 * 1000, // min 1h
             2 * 60 * 60 * 1000, // max 2h
@@ -456,7 +555,7 @@ mod tests {
             )],
         );
 
-        let result = optimize(current_planning, events_to_schedule);
+        let result = optimize(current_planning, events_to_schedule, vec![]);
         assert!(result.is_ok());
         let optimized_planning = result.unwrap();
         let all_events: Vec<&Event> = optimized_planning.events.values().flatten().collect();
@@ -464,5 +563,48 @@ mod tests {
         assert!(!sport_events.is_empty());
         let sport_total_duration: u64 = sport_events.iter().map(|e| e.duration()).sum();
         assert_eq!(sport_total_duration, 2 * 60 * 60 * 1000);
+    }
+
+    #[test]
+    fn optimize_places_events_within_category_timeslot() {
+        use std::collections::HashMap;
+
+        // Category 1: Only in the evening (18:00 - 21:00) on Monday
+        let mut monday_cat_slots = HashMap::new();
+        monday_cat_slots.insert(
+            MONDAY,
+            Timeslot::new(MONDAY, 18 * 60 * 60 * 1000, 21 * 60 * 60 * 1000),
+        );
+        let evening_category = EventCategory::new(1, "Evening", monday_cat_slots);
+
+        let events_to_schedule = vec![SchedulableEvent::new(
+            "Sport",
+            Some(vec![1]),
+            2 * 60 * 60 * 1000, // 2h total
+            1 * 60 * 60 * 1000, // min 1h
+            2 * 60 * 60 * 1000, // max 2h
+        )];
+
+        let mut current_planning = Planning::new();
+        current_planning.events.insert(
+            MONDAY,
+            vec![Event::new(
+                "Work",
+                MONDAY,
+                8 * 60 * 60 * 1000,
+                17 * 60 * 60 * 1000,
+            )],
+        );
+
+        let result = optimize(current_planning, events_to_schedule, vec![evening_category]);
+        assert!(result.is_ok());
+        let optimized = result.unwrap();
+        let monday_events = optimized.events.get(&MONDAY).unwrap();
+        let sport = monday_events.iter().find(|e| e.label == "Sport").unwrap();
+
+        // The sport event must start at or after 18:00 and end before or at 21:00
+        assert!(sport.start_time_ms >= 18 * 60 * 60 * 1000);
+        assert!(sport.end_time_ms <= 21 * 60 * 60 * 1000);
+        assert_eq!(sport.duration(), 2 * 60 * 60 * 1000);
     }
 }
